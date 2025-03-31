@@ -1,0 +1,1 @@
+﻿add_executable("Scheduler-Injector" "main.cpp")
