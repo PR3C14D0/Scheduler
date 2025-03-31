@@ -34,7 +34,7 @@ int main() {
     std::cout << "Allocated memory address: 0x" << std::hex << reinterpret_cast<DWORD_PTR>(lpAddr) << std::endl;
     WriteProcessMemory(hProcess, lpAddr, dllPath, MAX_PATH, nullptr);
 
-    HANDLE hThread = CreateRemoteThreadEx(hProcess, nullptr, NULL, (LPTHREAD_START_ROUTINE)LoadLibraryA, lpAddr,  NULL, nullptr, nullptr);
+    HANDLE hThread = CreateRemoteThreadEx(hProcess, nullptr, NULL, reinterpret_cast<LPTHREAD_START_ROUTINE>(LoadLibraryA), lpAddr,  NULL, nullptr, nullptr);
 
     if (hThread)
         CloseHandle(hThread);
