@@ -16,8 +16,31 @@ int main() {
     std::cout << "Process name: " << procName << std::endl;
     std::cout << "Process ID: " << dwPid << std::endl;
 
-    const char* dllName = "dxgi.dll";
+    if (dwPid <= 0) {
+        std::cout << "Process not found" << std::endl;
+        return 1;
+    }
+
+    const char* dllName = "SchedulerDLL.dll";
     char dllPath[MAX_PATH];
+
+    GetFullPathName(dllName, MAX_PATH, dllPath, nullptr);
+    std::cout << "DLL name: " << dllName << std::endl;
+    std::cout << "DLL path: " << dllPath << std::endl;
+
+    HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, dwPid);
+    LPVOID lpAddr = VirtualAllocEx(hProcess, nullptr, MAX_PATH, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+
+    std::cout << "Allocated memory address: 0x" << std::hex << reinterpret_cast<DWORD_PTR>(lpAddr) << std::endl;
+    WriteProcessMemory(hProcess, lpAddr, dllPath, MAX_PATH, nullptr);
+
+    HANDLE hThread = CreateRemoteThreadEx(hProcess, nullptr, NULL, (LPTHREAD_START_ROUTINE)LoadLibraryA, lpAddr,  NULL, nullptr, nullptr);
+
+    if (hThread)
+        CloseHandle(hThread);
+
+    if (hProcess)
+        CloseHandle(hProcess);
 
     return 0;
 }
