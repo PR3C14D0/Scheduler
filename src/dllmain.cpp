@@ -18,13 +18,18 @@ using namespace Microsoft::WRL;
 void Main();
 
 typedef HRESULT(__stdcall* DXGIPresent_t)(IDXGISwapChain*, UINT, UINT);
+typedef void(__fastcall* CashUpdate_t)(ScheduleOne_Money_MoneyManager_o* _this);
 HRESULT __stdcall hkPresent(IDXGISwapChain* This, UINT SyncInterval, UINT Flags);
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+void __fastcall hkCashUpdate(ScheduleOne_Money_MoneyManager_o* _this);
 
 DXGIPresent_t g_ogPresent = nullptr;
+CashUpdate_t g_ogCashUpdate = nullptr;
 bool g_bImGuiInit = false;
+
+bool g_bChangeCash = false;
 
 ComPtr<ID3D11Device> g_dev;
 ComPtr<ID3D11DeviceContext> g_con;
@@ -34,6 +39,11 @@ ComPtr<ID3D11RenderTargetView> g_rtv;
 LONG_PTR g_OldWndProc;
 
 HWND g_hwnd = NULL;
+
+#define CHANGE_CASH_VALUE 0x9316B0;
+
+float g_fCash = 0.0f;
+
 
 BOOL WINAPI DllMain(HINSTANCE hInstance, DWORD fdwReason, LPVOID lpvReserved) {
     switch (fdwReason) {
@@ -55,6 +65,7 @@ void Main() {
     std::cout << "Github: https://github.com/PR3C14D0" << std::endl;
 
     HMODULE GameAssembly = GetModuleHandle("GameAssembly.dll");
+    LPVOID lpGameAssembly = reinterpret_cast<LPVOID>(GameAssembly);
    
     ComPtr<ID3D11Device> pDev;
     ComPtr<ID3D11DeviceContext> pCon;
@@ -101,7 +112,6 @@ void Main() {
 
     //Memory::DisableSteamOverlay(lpPresent, 5);
 
-
     LPVOID gateway = nullptr;
     LPVOID lpPresentRelay = Memory::CreateHook(lpPresent, &hkPresent, 5, gateway);
     g_ogPresent = reinterpret_cast<DXGIPresent_t>(gateway);
@@ -110,6 +120,18 @@ void Main() {
     Memory::Detour32(lpPresent, lpPresentRelay, 5);
 
     g_OldWndProc = SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LONG_PTR)WndProc);
+
+    LPVOID lpCashUpdate = (char*)lpGameAssembly + CHANGE_CASH_VALUE;
+    g_ogCashUpdate = reinterpret_cast<CashUpdate_t>(lpCashUpdate);
+    std::cout << "Cash update value address: 0x" << std::hex << (DWORD_PTR)lpCashUpdate << std::endl;
+    
+    LPVOID lpCashGateway = nullptr;
+    LPVOID lpCashRelay = Memory::CreateHook(lpCashUpdate, &hkCashUpdate, 7, lpCashGateway);
+    
+    g_ogCashUpdate = reinterpret_cast<CashUpdate_t>(lpCashGateway);
+    Memory::Detour32(lpCashUpdate, lpCashRelay, 7);
+
+
 }
 
 HRESULT __stdcall hkPresent(IDXGISwapChain* This, UINT SyncInterval, UINT Flags) {
@@ -140,6 +162,12 @@ HRESULT __stdcall hkPresent(IDXGISwapChain* This, UINT SyncInterval, UINT Flags)
 
     ImGui::SetNextWindowSize(ImVec2{ 300, 300 });
     ImGui::Begin("Scheduler");
+    if (ImGui::Button("Add 10k")) {
+        HMODULE GameAssembly = GetModuleHandle("GameAssembly.dll");
+        LPVOID lpGameAssembly = reinterpret_cast<LPVOID>(GameAssembly);
+        DWORD_PTR lpCashAddr = Memory::FindDMAAddy((DWORD_PTR)((char*)lpGameAssembly + 0x037A4690), { 0x40, 0xB8, 0x10, 0xF0, 0x1C8, 0x38 });
+        *(float*)lpCashAddr = *(float*)lpCashAddr + 10000.f;
+    }
     ImGui::End();
 
     ImGui::Render();
@@ -153,4 +181,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
         return 0;
 
     return CallWindowProc((WNDPROC)g_OldWndProc, hwnd, uMsg, wParam, lParam);
+}
+
+void __fastcall hkCashUpdate(ScheduleOne_Money_MoneyManager_o* _this) {
+
+    return g_ogCashUpdate(_this);
 }

@@ -1,6 +1,7 @@
 #pragma once
 #include <iostream>
 #include <Windows.h>
+#include <vector>
 
 namespace Memory {
 	LPVOID CreateHook(LPVOID lpSrc, LPVOID lpDst, UINT nMangledBytes, LPVOID& lpGateway);
@@ -8,4 +9,6 @@ namespace Memory {
 	void DisableSteamOverlay(LPVOID lpAddr, UINT nSize);
 
 	void Detour32(LPVOID lpSrc, LPVOID lpDst, UINT nMangledBytes);
+
+	uintptr_t FindDMAAddy(uintptr_t ptr, std::vector<unsigned int> offsets);
 }
