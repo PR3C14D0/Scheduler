@@ -46,5 +46,16 @@ LPVOID Memory::CreateHook(LPVOID lpSrc, LPVOID lpDst, UINT nMangledBytes, LPVOID
 
 	lpAddr = (char*)lpAddr + nJmpSize + sizeof(DWORD_PTR);
 
+	/* 
+		Rel32 JMP: 5 bytes (JMP + 32 Bit relative address
+			Relative address: Destination - Source - JMP instruction (5)
+	*/
+	memcpy(lpAddr, lpMangledBytes, nMangledBytes);
+	DWORD relAddr = (DWORD)lpSrc - (DWORD)lpAddr - 5;
+	*((char*)lpAddr + nMangledBytes) = 0xE9;
+	*(DWORD*)((char*)lpAddr + nMangledBytes + 1) = relAddr;
+
+	lpGateway = lpAddr;
+
 	return lpRelay;
 }
