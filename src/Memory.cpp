@@ -40,7 +40,11 @@ LPVOID Memory::CreateHook(LPVOID lpSrc, LPVOID lpDst, UINT nMangledBytes, LPVOID
 
 	UINT nJmpSize = sizeof(ABS_JMP);
 	
+	memcpy(lpAddr, ABS_JMP, nJmpSize);
 
+	*(DWORD_PTR*)((char*)lpAddr + nJmpSize) = reinterpret_cast<DWORD_PTR>(lpDst);
+
+	lpAddr = (char*)lpAddr + nJmpSize + sizeof(DWORD_PTR);
 
 	return lpRelay;
 }
