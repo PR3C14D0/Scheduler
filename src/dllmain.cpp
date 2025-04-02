@@ -84,9 +84,6 @@ void Main() {
 
     //Memory::DisableSteamOverlay(lpPresent, 5);
 
-    /*pDev->Release();
-    pCon->Release();
-    pSc->Release();*/
 
     LPVOID gateway = nullptr;
     LPVOID lpPresentRelay = Memory::CreateHook(lpPresent, &hkPresent, 5, gateway);
@@ -97,6 +94,6 @@ void Main() {
 }
 
 HRESULT __stdcall hkPresent(IDXGISwapChain* This, UINT SyncInterval, UINT Flags) {
-    std::cout << "Hooked" << std::endl;
+    
     return g_ogPresent(This, SyncInterval, Flags);
 }
