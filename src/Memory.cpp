@@ -59,3 +59,9 @@ LPVOID Memory::CreateHook(LPVOID lpSrc, LPVOID lpDst, UINT nMangledBytes, LPVOID
 
 	return lpRelay;
 }
+
+void Memory::DisableSteamOverlay(LPVOID lpAddr, UINT nSize) {
+	for (UINT i = 0; i < nSize; i++) {
+		*((char*)lpAddr + i) = 0x90;
+	}
+}
