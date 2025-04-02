@@ -4,6 +4,9 @@
 #include <d3d11.h>
 #include <dxgi.h>
 #include <wrl.h>
+#include <imgui/imgui.h>
+#include <imgui/imgui_impl_dx11.h>
+#include <imgui/imgui_impl_win32.h>
 
 #include "il2cpp.h"
 #include "pragma.h"
@@ -18,6 +21,14 @@ typedef HRESULT(__stdcall* DXGIPresent_t)(IDXGISwapChain*, UINT, UINT);
 HRESULT __stdcall hkPresent(IDXGISwapChain* This, UINT SyncInterval, UINT Flags);
 
 DXGIPresent_t g_ogPresent = nullptr;
+bool g_bImGuiInit = false;
+
+ComPtr<ID3D11Device> g_dev;
+ComPtr<ID3D11DeviceContext> g_con;
+ComPtr<ID3D11Texture2D> g_backBuffer;
+ComPtr<ID3D11RenderTargetView> g_rtv;
+
+HWND g_hwnd = NULL;
 
 BOOL WINAPI DllMain(HINSTANCE hInstance, DWORD fdwReason, LPVOID lpvReserved) {
     switch (fdwReason) {
@@ -46,6 +57,7 @@ void Main() {
 
     HWND hwnd = NULL;
     hwnd = FindWindow(nullptr, "Schedule I");
+    g_hwnd = hwnd;
 
     if (!hwnd) {
         std::cout << "Failed to find the Window Handle" << std::endl;
@@ -94,6 +106,37 @@ void Main() {
 }
 
 HRESULT __stdcall hkPresent(IDXGISwapChain* This, UINT SyncInterval, UINT Flags) {
-    
+   
+    if (!g_bImGuiInit) {
+        
+        This->GetDevice(IID_PPV_ARGS(g_dev.GetAddressOf()));
+        g_dev->GetImmediateContext(g_con.GetAddressOf());
+
+        This->GetBuffer(0, IID_PPV_ARGS(g_backBuffer.GetAddressOf()));
+        g_dev->CreateRenderTargetView(g_backBuffer.Get(), nullptr, g_rtv.GetAddressOf());
+
+        IMGUI_CHECKVERSION();
+        ImGui::CreateContext();
+        ImGui_ImplDX11_Init(g_dev.Get(), g_con.Get());
+        ImGui_ImplWin32_Init(g_hwnd);
+
+        ImGuiIO& io = ImGui::GetIO(); (void)io;
+
+        g_bImGuiInit = true;
+    }
+
+    g_con->OMSetRenderTargets(1, g_rtv.GetAddressOf(), nullptr);
+
+    ImGui_ImplWin32_NewFrame();
+    ImGui_ImplDX11_NewFrame();
+    ImGui::NewFrame();
+
+    ImGui::SetNextWindowSize(ImVec2{ 300, 300 });
+    ImGui::Begin("Scheduler");
+    ImGui::End();
+
+    ImGui::Render();
+    ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
+
     return g_ogPresent(This, SyncInterval, Flags);
 }
