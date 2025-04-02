@@ -19,6 +19,9 @@ void Main();
 
 typedef HRESULT(__stdcall* DXGIPresent_t)(IDXGISwapChain*, UINT, UINT);
 HRESULT __stdcall hkPresent(IDXGISwapChain* This, UINT SyncInterval, UINT Flags);
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+
+LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
 DXGIPresent_t g_ogPresent = nullptr;
 bool g_bImGuiInit = false;
@@ -27,6 +30,8 @@ ComPtr<ID3D11Device> g_dev;
 ComPtr<ID3D11DeviceContext> g_con;
 ComPtr<ID3D11Texture2D> g_backBuffer;
 ComPtr<ID3D11RenderTargetView> g_rtv;
+
+LONG_PTR g_OldWndProc;
 
 HWND g_hwnd = NULL;
 
@@ -103,6 +108,8 @@ void Main() {
     std::cout << "Gateway at: 0x" << std::hex << (DWORD_PTR)gateway << std::endl;
 
     Memory::Detour32(lpPresent, lpPresentRelay, 5);
+
+    g_OldWndProc = SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LONG_PTR)WndProc);
 }
 
 HRESULT __stdcall hkPresent(IDXGISwapChain* This, UINT SyncInterval, UINT Flags) {
@@ -139,4 +146,11 @@ HRESULT __stdcall hkPresent(IDXGISwapChain* This, UINT SyncInterval, UINT Flags)
     ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 
     return g_ogPresent(This, SyncInterval, Flags);
+}
+
+LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+    if (ImGui_ImplWin32_WndProcHandler(hwnd, uMsg, wParam, lParam))
+        return 0;
+
+    return CallWindowProc((WNDPROC)g_OldWndProc, hwnd, uMsg, wParam, lParam);
 }
