@@ -20,7 +20,7 @@ LPVOID Memory::CreateHook(LPVOID lpSrc, LPVOID lpDst, UINT nMangledBytes, LPVOID
 	LPVOID lpRelay = nullptr;
 
 	do {
-		lpRelay = VirtualAlloc(lpLoc, 1, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+		lpRelay = VirtualAlloc(lpLoc, 1, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
 		lpLoc = (char*)lpLoc + 0x200;
 	} while (lpRelay == nullptr);
 
@@ -51,7 +51,7 @@ LPVOID Memory::CreateHook(LPVOID lpSrc, LPVOID lpDst, UINT nMangledBytes, LPVOID
 			Relative address: Destination - Source - JMP instruction (5)
 	*/
 	memcpy(lpAddr, lpMangledBytes, nMangledBytes);
-	DWORD relAddr = (DWORD)lpSrc - (DWORD)lpAddr - 5;
+	DWORD relAddr = (DWORD_PTR)lpSrc - (DWORD_PTR)lpAddr - 5;
 	*((char*)lpAddr + nMangledBytes) = 0xE9;
 	*(DWORD*)((char*)lpAddr + nMangledBytes + 1) = relAddr;
 
@@ -64,4 +64,19 @@ void Memory::DisableSteamOverlay(LPVOID lpAddr, UINT nSize) {
 	for (UINT i = 0; i < nSize; i++) {
 		*((char*)lpAddr + i) = 0x90;
 	}
+}
+
+void Memory::Detour32(LPVOID lpSrc, LPVOID lpDst, UINT nMangledBytes) {
+	DWORD dwOldProt;
+	VirtualProtect(lpSrc, nMangledBytes, PAGE_EXECUTE_READWRITE, &dwOldProt);
+	for (UINT i = 0; i < nMangledBytes; i++) {
+		*((char*)lpSrc + i) = 0x90;
+	}
+
+	DWORD relAddr = (DWORD_PTR)lpDst - (DWORD_PTR)lpSrc - 5;
+
+	*(char*)lpSrc = 0xE9;
+	*(DWORD*)((char*)lpSrc + 1) = relAddr;
+	VirtualProtect(lpSrc, nMangledBytes, dwOldProt, nullptr);
+	return;
 }

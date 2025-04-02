@@ -21,7 +21,7 @@ int main() {
         return 1;
     }
 
-    const char* dllName = "SchedulerDLL.dll";
+    const char* dllName = "dxgi.dll";
     char dllPath[MAX_PATH];
 
     GetFullPathName(dllName, MAX_PATH, dllPath, nullptr);
