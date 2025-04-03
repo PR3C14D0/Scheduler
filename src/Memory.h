@@ -11,4 +11,6 @@ namespace Memory {
 	void Detour32(LPVOID lpSrc, LPVOID lpDst, UINT nMangledBytes);
 
 	uintptr_t FindDMAAddy(uintptr_t ptr, std::vector<unsigned int> offsets);
+	std::vector<int> PatternToByte(const char* pattern);
+	LPVOID FindBySignature(HMODULE hModule, const char* pattern);
 }

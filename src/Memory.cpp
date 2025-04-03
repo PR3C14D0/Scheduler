@@ -90,3 +90,27 @@ uintptr_t Memory::FindDMAAddy(uintptr_t ptr, std::vector<unsigned int> offsets) 
 	}
 	return addr;
 }
+
+std::vector<int> Memory::PatternToByte(const char* pattern) {
+	std::vector<int> bytes;
+	const char* current = pattern;
+	while (*current) {
+		if (*current == ' ') {
+			++current;
+			continue;
+		}
+		if (*current == '?') {
+			bytes.push_back(-1); // Wildcard
+			if (*(current + 1) == '?') ++current;
+		}
+		else {
+			bytes.push_back(strtoul(current, nullptr, 16));
+		}
+		current += 2;
+	}
+	return bytes;
+}
+
+LPVOID Memory::FindBySignature(HMODULE hModule, const char* pattern) {
+	
+}
