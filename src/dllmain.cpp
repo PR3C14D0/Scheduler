@@ -7,6 +7,7 @@
 #include <imgui/imgui.h>
 #include <imgui/imgui_impl_dx11.h>
 #include <imgui/imgui_impl_win32.h>
+#include <Psapi.h>
 
 #include "il2cpp.h"
 #include "pragma.h"
@@ -44,6 +45,9 @@ HWND g_hwnd = NULL;
 
 float g_fCash = 0.0f;
 
+void ClassicHook();
+void SteamHook(HMODULE hModule);
+
 
 BOOL WINAPI DllMain(HINSTANCE hInstance, DWORD fdwReason, LPVOID lpvReserved) {
     switch (fdwReason) {
@@ -66,10 +70,6 @@ void Main() {
 
     HMODULE GameAssembly = GetModuleHandle("GameAssembly.dll");
     LPVOID lpGameAssembly = reinterpret_cast<LPVOID>(GameAssembly);
-   
-    ComPtr<ID3D11Device> pDev;
-    ComPtr<ID3D11DeviceContext> pCon;
-    ComPtr<IDXGISwapChain> pSc;
 
     HWND hwnd = NULL;
     hwnd = FindWindow(nullptr, "Schedule I");
@@ -80,14 +80,43 @@ void Main() {
         return;
     }
 
+    HMODULE GameOverlay = nullptr;
+    GameOverlay = GetModuleHandle("GameOverlayRenderer64.dll");
+
+    if (GameOverlay) {
+        SteamHook(GameOverlay);
+    }
+    else {
+        ClassicHook();
+    }
+
+    g_OldWndProc = SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LONG_PTR)WndProc);
+
+    LPVOID lpCashUpdate = (char*)lpGameAssembly + CHANGE_CASH_VALUE;
+    g_ogCashUpdate = reinterpret_cast<CashUpdate_t>(lpCashUpdate);
+    std::cout << "Cash update value address: 0x" << std::hex << (DWORD_PTR)lpCashUpdate << std::endl;
+    
+    LPVOID lpCashGateway = nullptr;
+    LPVOID lpCashRelay = Memory::CreateHook(lpCashUpdate, &hkCashUpdate, 7, lpCashGateway);
+    
+    g_ogCashUpdate = reinterpret_cast<CashUpdate_t>(lpCashGateway);
+    Memory::Detour32(lpCashUpdate, lpCashRelay, 7);
+}
+
+void ClassicHook() {
+    /* Dummy device method */
+    ComPtr<ID3D11Device> pDev;
+    ComPtr<ID3D11DeviceContext> pCon;
+    ComPtr<IDXGISwapChain> pSc;
+
     DXGI_SWAP_CHAIN_DESC scDesc = { };
-	scDesc.BufferDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
-	scDesc.BufferCount = 1;
-	scDesc.SampleDesc.Count = 1;
-	scDesc.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
-	scDesc.Windowed = TRUE;
-	scDesc.OutputWindow = hwnd;
-	scDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+    scDesc.BufferDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+    scDesc.BufferCount = 1;
+    scDesc.SampleDesc.Count = 1;
+    scDesc.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
+    scDesc.Windowed = TRUE;
+    scDesc.OutputWindow = g_hwnd;
+    scDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 
     ThrowIfFailed(D3D11CreateDeviceAndSwapChain(nullptr,
         D3D_DRIVER_TYPE_HARDWARE,
@@ -95,7 +124,7 @@ void Main() {
         NULL,
         nullptr,
         NULL,
-        D3D11_SDK_VERSION, 
+        D3D11_SDK_VERSION,
         &scDesc,
         pSc.GetAddressOf(),
         pDev.GetAddressOf(),
@@ -110,28 +139,19 @@ void Main() {
     std::cout << "IDXGISwapChain::Present address: 0x" << std::hex << (DWORD_PTR)lpPresent << std::endl;
     g_ogPresent = reinterpret_cast<DXGIPresent_t>(lpPresent);
 
-    //Memory::DisableSteamOverlay(lpPresent, 5);
-
     LPVOID gateway = nullptr;
     LPVOID lpPresentRelay = Memory::CreateHook(lpPresent, &hkPresent, 5, gateway);
     g_ogPresent = reinterpret_cast<DXGIPresent_t>(gateway);
     std::cout << "Gateway at: 0x" << std::hex << (DWORD_PTR)gateway << std::endl;
-
     Memory::Detour32(lpPresent, lpPresentRelay, 5);
 
-    g_OldWndProc = SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LONG_PTR)WndProc);
+}
 
-    LPVOID lpCashUpdate = (char*)lpGameAssembly + CHANGE_CASH_VALUE;
-    g_ogCashUpdate = reinterpret_cast<CashUpdate_t>(lpCashUpdate);
-    std::cout << "Cash update value address: 0x" << std::hex << (DWORD_PTR)lpCashUpdate << std::endl;
-    
-    LPVOID lpCashGateway = nullptr;
-    LPVOID lpCashRelay = Memory::CreateHook(lpCashUpdate, &hkCashUpdate, 7, lpCashGateway);
-    
-    g_ogCashUpdate = reinterpret_cast<CashUpdate_t>(lpCashGateway);
-    Memory::Detour32(lpCashUpdate, lpCashRelay, 7);
+void SteamHook(HMODULE hModule) {
+    // 48 89 5C 24 ? 48 89 6C 24 ? 48 89 74 24 ? 57 41 56 41 57 48 83 EC ? 41 8B E8 - HkPresent
+    // 48 89 5C 24 ? 57 48 83 EC ? 33 C0 48 89 44 24 - CreateHook
 
-
+    const char* hkPresentSig = "48 89 5C 24 ? 48 89 6C 24 ? 48 89 74 24 ? 57 41 56 41 57 48 83 EC ? 41 8B E8";
 }
 
 HRESULT __stdcall hkPresent(IDXGISwapChain* This, UINT SyncInterval, UINT Flags) {
