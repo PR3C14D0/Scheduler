@@ -152,6 +152,17 @@ void SteamHook(HMODULE hModule) {
     // 48 89 5C 24 ? 57 48 83 EC ? 33 C0 48 89 44 24 - CreateHook
 
     const char* hkPresentSig = "48 89 5C 24 ? 48 89 6C 24 ? 48 89 74 24 ? 57 41 56 41 57 48 83 EC ? 41 8B E8";
+    LPVOID lpSteamPresent = Memory::FindBySignature(hModule, hkPresentSig);
+
+    const char* SteamCreateHookSig = "48 89 5C 24 ? 57 48 83 EC ? 33 C0 48 89 44 24";
+    LPVOID lpSteamCreateHook = Memory::FindBySignature(hModule, SteamCreateHookSig);
+
+    std::cout << "Steam Present hook: 0x" << std::hex << (DWORD_PTR)lpSteamPresent << std::endl;
+    std::cout << "Steam Create hook: 0x" << std::hex << (DWORD_PTR)lpSteamCreateHook << std::endl;
+
+    __int64(__fastcall* SteamCreateHook)(void* a1, __int64 a2, unsigned __int64 * a3, int a4);
+    SteamCreateHook = (decltype(SteamCreateHook))lpSteamCreateHook;
+    SteamCreateHook(lpSteamPresent, (__int64)&hkPresent, (unsigned __int64*)&g_ogPresent, 1);
 }
 
 HRESULT __stdcall hkPresent(IDXGISwapChain* This, UINT SyncInterval, UINT Flags) {
