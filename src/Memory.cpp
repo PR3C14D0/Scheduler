@@ -94,53 +94,57 @@ uintptr_t Memory::FindDMAAddy(uintptr_t ptr, std::vector<unsigned int> offsets) 
 std::vector<int> Memory::PatternToByte(const char* pattern) {
 	std::vector<int> bytes;
 	const char* current = pattern;
+
 	while (*current) {
 		if (*current == ' ') {
 			++current;
 			continue;
 		}
+
 		if (*current == '?') {
-			bytes.push_back(-1); // Wildcard
+			bytes.push_back(-1);  // Wildcard
 			if (*(current + 1) == '?') ++current;
 		}
 		else {
-			bytes.push_back(strtoul(current, nullptr, 16));
+			bytes.push_back(static_cast<int>(std::strtoul(current, nullptr, 16)));
 		}
 		current += 2;
 	}
+
 	return bytes;
 }
 
 LPVOID Memory::FindBySignature(HMODULE hModule, const char* pattern) {
-	MEMORY_BASIC_INFORMATION mbi;
-	uintptr_t baseAddr = reinterpret_cast<uintptr_t>(hModule);
+	if (!hModule || !pattern) return nullptr;
+
 	MODULEINFO modInfo;
+	if (!GetModuleInformation(GetCurrentProcess(), hModule, &modInfo, sizeof(modInfo)))
+		return nullptr;
 
-	if (GetModuleInformation(GetCurrentProcess(), hModule, &modInfo, sizeof(modInfo))) {
-		uintptr_t start = baseAddr;
-		uintptr_t end = baseAddr + modInfo.SizeOfImage;
+	uintptr_t start = reinterpret_cast<uintptr_t>(hModule);
+	uintptr_t end = start + modInfo.SizeOfImage;
 
-		std::vector<int> patternBytes = PatternToByte(pattern);
+	std::vector<int> patternBytes = PatternToByte(pattern);
+	size_t patternSize = patternBytes.size();
 
-		for (uintptr_t addr = start; addr < end; addr++) {
-			size_t nBytesRead;
-			std::vector<BYTE> buff;
-			buff.resize(patternBytes.size());
+	for (uintptr_t addr = start; addr < end - patternSize; addr++) {
+		SIZE_T bytesRead;
+		std::vector<BYTE> buffer(patternSize);
 
-			if (ReadProcessMemory(GetCurrentProcess(), (LPCVOID)addr, buff.data(), patternBytes.size(), &nBytesRead)) {
-				bool bFound = true;
+		if (ReadProcessMemory(GetCurrentProcess(), reinterpret_cast<LPCVOID>(addr), buffer.data(), patternSize, &bytesRead) &&
+			bytesRead == patternSize) {
 
-				for (size_t i = 0; i < patternBytes.size(); i++) {
-					if (patternBytes[i] != -1 && buff[i] != (BYTE)patternBytes[i]) {
-						bFound = false;
-						break;
-					}
-				}
-				if (bFound) {
-					return (LPVOID)addr;
+			bool found = true;
+			for (size_t i = 0; i < patternSize; i++) {
+				if (patternBytes[i] != -1 && buffer[i] != static_cast<BYTE>(patternBytes[i])) {
+					found = false;
+					break;
 				}
 			}
 
+			if (found) {
+				return reinterpret_cast<LPVOID>(addr);
+			}
 		}
 	}
 
