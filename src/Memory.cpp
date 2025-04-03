@@ -112,5 +112,37 @@ std::vector<int> Memory::PatternToByte(const char* pattern) {
 }
 
 LPVOID Memory::FindBySignature(HMODULE hModule, const char* pattern) {
-	
+	MEMORY_BASIC_INFORMATION mbi;
+	uintptr_t baseAddr = reinterpret_cast<uintptr_t>(hModule);
+	MODULEINFO modInfo;
+
+	if (GetModuleInformation(GetCurrentProcess(), hModule, &modInfo, sizeof(modInfo))) {
+		uintptr_t start = baseAddr;
+		uintptr_t end = baseAddr + modInfo.SizeOfImage;
+
+		std::vector<int> patternBytes = PatternToByte(pattern);
+
+		for (uintptr_t addr = start; addr < end; addr++) {
+			size_t nBytesRead;
+			std::vector<BYTE> buff;
+			buff.resize(patternBytes.size());
+
+			if (ReadProcessMemory(GetCurrentProcess(), (LPCVOID)addr, buff.data(), patternBytes.size(), &nBytesRead)) {
+				bool bFound = true;
+
+				for (size_t i = 0; i < patternBytes.size(); i++) {
+					if (patternBytes[i] != -1 && buff[i] != (BYTE)patternBytes[i]) {
+						bFound = false;
+						break;
+					}
+				}
+				if (bFound) {
+					return (LPVOID)addr;
+				}
+			}
+
+		}
+	}
+
+	return nullptr;
 }

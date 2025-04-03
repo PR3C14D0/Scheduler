@@ -2,6 +2,7 @@
 #include <iostream>
 #include <Windows.h>
 #include <vector>
+#include <Psapi.h>
 
 namespace Memory {
 	LPVOID CreateHook(LPVOID lpSrc, LPVOID lpDst, UINT nMangledBytes, LPVOID& lpGateway);
